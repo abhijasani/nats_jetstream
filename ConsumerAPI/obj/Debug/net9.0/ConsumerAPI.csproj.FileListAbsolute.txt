@@ -1,0 +1,88 @@
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\appsettings.Development.json
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\appsettings.json
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.staticwebassets.endpoints.json
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.exe
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.deps.json
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.runtimeconfig.json
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.pdb
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\Microsoft.OpenApi.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Core.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Hosting.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.JetStream.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.KeyValueStore.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.ObjectStore.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Serializers.Json.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Services.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Simplified.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\NATS.Net.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\POC\nats\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.csproj.AssemblyReference.cache
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.GeneratedMSBuildEditorConfig.editorconfig
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.AssemblyInfoInputs.cache
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.AssemblyInfo.cs
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.csproj.CoreCompileInputs.cache
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.MvcApplicationPartsAssemblyInfo.cs
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.MvcApplicationPartsAssemblyInfo.cache
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\scopedcss\bundle\ConsumerAPI.styles.css
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets.build.json
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets.development.json
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets.build.endpoints.json
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.ConsumerAPI.Microsoft.AspNetCore.StaticWebAssets.props
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.ConsumerAPI.Microsoft.AspNetCore.StaticWebAssetEndpoints.props
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.build.ConsumerAPI.props
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.buildMultiTargeting.ConsumerAPI.props
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.buildTransitive.ConsumerAPI.props
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\staticwebassets.pack.json
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\Consumer.4F7FB887.Up2Date
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.dll
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\refint\ConsumerAPI.dll
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.pdb
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.genruntimeconfig.cache
+D:\POC\nats\ConsumerAPI\obj\Debug\net9.0\ref\ConsumerAPI.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\appsettings.Development.json
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\appsettings.json
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.staticwebassets.endpoints.json
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.exe
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.deps.json
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.runtimeconfig.json
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\ConsumerAPI.pdb
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\Microsoft.OpenApi.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Core.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Hosting.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.JetStream.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.KeyValueStore.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.ObjectStore.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Serializers.Json.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Services.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Client.Simplified.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\NATS.Net.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\POC\nats with jetStream\ConsumerAPI\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.csproj.AssemblyReference.cache
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.GeneratedMSBuildEditorConfig.editorconfig
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.AssemblyInfoInputs.cache
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.AssemblyInfo.cs
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.csproj.CoreCompileInputs.cache
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.MvcApplicationPartsAssemblyInfo.cs
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.MvcApplicationPartsAssemblyInfo.cache
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\scopedcss\bundle\ConsumerAPI.styles.css
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets.build.json
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets.development.json
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets.build.endpoints.json
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.ConsumerAPI.Microsoft.AspNetCore.StaticWebAssets.props
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.ConsumerAPI.Microsoft.AspNetCore.StaticWebAssetEndpoints.props
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.build.ConsumerAPI.props
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.buildMultiTargeting.ConsumerAPI.props
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets\msbuild.buildTransitive.ConsumerAPI.props
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\staticwebassets.pack.json
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\Consumer.4F7FB887.Up2Date
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.dll
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\refint\ConsumerAPI.dll
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.pdb
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ConsumerAPI.genruntimeconfig.cache
+D:\POC\nats with jetStream\ConsumerAPI\obj\Debug\net9.0\ref\ConsumerAPI.dll

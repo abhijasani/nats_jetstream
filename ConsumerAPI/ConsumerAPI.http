@@ -1,0 +1,6 @@
+@ConsumerAPI_HostAddress = http://localhost:5162
+
+GET {{ConsumerAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

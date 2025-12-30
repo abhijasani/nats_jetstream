@@ -1,0 +1,715 @@
+benchmark.ps1
+
+# ===============================
+# Benchmark Configuration
+# ===============================
+$Count = 500000
+$Iterations = 10
+$Url = "http://localhost:5122/api/publish-batch?count=$Count"
+
+# Arrays to store metrics
+$durations = @()
+$cpuUsages = @()
+$memoryUsages = @()
+$cpuDeltas = @()
+$memoryDeltas = @()
+
+Write-Host "===============================`n"
+Write-Host "Starting Benchmark Test`n"
+Write-Host "Messages per iteration: $Count`n"
+Write-Host "Total iterations: $Iterations`n"
+Write-Host "===============================`n"
+
+# Get the NATS container name (leave empty for local/non-Docker runs)
+$containerName = ""  # e.g., set to "nats" when using Docker; empty enables process-based stats
+
+# Process name pattern for bare-metal NATS (aggregate 32/64-bit instances)
+$natsProcessNamePattern = "nats-server"
+
+# Function to get Docker container stats
+function Get-DockerStats {
+    param($containerName)
+    
+    try {
+        if (-not $containerName) { return $null }
+        $stats = docker stats $containerName --no-stream --format "{{.CPUPerc}},{{.MemUsage}}" 2>$null
+        if ($stats) {
+            $parts = $stats -split ','
+            $cpuPercent = $parts[0] -replace '%', ''
+            $memUsage = $parts[1] -split '/' | Select-Object -First 1
+            
+            # Convert memory to MB if needed
+            if ($memUsage -match '(\d+\.?\d*)([MGK]i?B)') {
+                $value = [double]$matches[1]
+                $unit = $matches[2]
+                
+                $memoryMB = switch -Wildcard ($unit) {
+                    "G*" { $value * 1024 }
+                    "M*" { $value }
+                    "K*" { $value / 1024 }
+                    default { $value }
+                }
+            } else {
+                $memoryMB = 0
+            }
+            
+            return @{
+                CPU = [double]$cpuPercent
+                Memory = $memoryMB
+            }
+        }
+    } catch {
+        Write-Host "Warning: Could not get Docker stats"
+    }
+    
+    return $null
+}
+
+# Function to get raw CPU time (seconds) and memory (MB) for local nats-server processes
+function Get-NatsProcessesRawStats {
+    param([string]$namePattern = "nats-server")
+
+    try {
+        $procs = Get-Process | Where-Object { $_.Name -like "$namePattern*" }
+        if (-not $procs) {
+            return @{ CpuSeconds = 0.0; MemoryMB = 0.0 }
+        }
+
+        $cpuSeconds = ($procs | Measure-Object -Property CPU -Sum).Sum
+        if ($null -eq $cpuSeconds) { $cpuSeconds = 0 }
+        $memBytes = ($procs | Measure-Object -Property WorkingSet64 -Sum).Sum
+        if ($null -eq $memBytes) { $memBytes = 0 }
+
+        return @{
+            CpuSeconds = [double]$cpuSeconds
+            MemoryMB   = [math]::Round(($memBytes / 1MB), 2)
+        }
+    } catch {
+        Write-Host "Warning: Could not get process stats"
+        return @{ CpuSeconds = 0.0; MemoryMB = 0.0 }
+    }
+}
+
+# ===============================
+# Main Benchmark Loop
+# ===============================
+for ($i = 1; $i -le $Iterations; $i++) {
+    Write-Host "`n--- Iteration $i of $Iterations ---"
+    
+    # Capture CPU and Memory before the call
+    if ($containerName) {
+        $statsBefore = Get-DockerStats -containerName $containerName
+    } else {
+        $rawBefore = Get-NatsProcessesRawStats -namePattern $natsProcessNamePattern
+        $tBefore = Get-Date
+    }
+    
+    # Make the API call
+    $start = Get-Date
+    try {
+        $response = Invoke-WebRequest -Uri $Url -Method POST -TimeoutSec 120
+        $end = Get-Date
+        $duration = ($end - $start).TotalMilliseconds
+        
+        # Store duration
+        $durations += $duration
+        
+        Write-Host "Status: $($response.StatusCode)"
+        Write-Host "Time Taken: $([math]::Round($duration, 2)) ms"
+        Write-Host "Throughput: $([math]::Round($Count / ($duration / 1000), 2)) messages/sec"
+        
+        # Capture CPU and Memory after the call
+        Start-Sleep -Milliseconds 500  # Small delay to let metrics update
+        
+        if ($containerName) {
+            $statsAfter = Get-DockerStats -containerName $containerName
+
+            if ($statsAfter -and $statsBefore) {
+                $cpuDelta = $statsAfter.CPU - $statsBefore.CPU
+                $memoryDelta = $statsAfter.Memory - $statsBefore.Memory
+                
+                $cpuUsages += $statsAfter.CPU
+                $memoryUsages += $statsAfter.Memory
+                $cpuDeltas += $cpuDelta
+                $memoryDeltas += $memoryDelta
+                
+                Write-Host "NATS CPU: $([math]::Round($statsAfter.CPU, 2))% (Delta: $([math]::Round($cpuDelta, 2))%)"
+                Write-Host "NATS Memory: $([math]::Round($statsAfter.Memory, 2)) MB (Delta: $([math]::Round($memoryDelta, 2)) MB)"
+            } elseif ($statsAfter) {
+                $cpuUsages += $statsAfter.CPU
+                $memoryUsages += $statsAfter.Memory
+                
+                Write-Host "NATS CPU: $([math]::Round($statsAfter.CPU, 2))%"
+                Write-Host "NATS Memory: $([math]::Round($statsAfter.Memory, 2)) MB"
+            }
+        } else {
+            $rawAfter = Get-NatsProcessesRawStats -namePattern $natsProcessNamePattern
+            $tAfter = Get-Date
+
+            $wall = ($tAfter - $tBefore).TotalSeconds
+            if ($wall -le 0) { $wall = 0.5 }
+            $cpuDeltaSec = $rawAfter.CpuSeconds - $rawBefore.CpuSeconds
+            $cpuCount = [int]$env:NUMBER_OF_PROCESSORS
+            if ($cpuCount -le 0) { $cpuCount = 1 }
+            # Normalize to percent of total system CPU (0-100)
+            $cpuPercent = if ($wall -gt 0) { (100.0 * $cpuDeltaSec / $wall) / $cpuCount } else { 0 }
+
+            $memoryDelta = $rawAfter.MemoryMB - $rawBefore.MemoryMB
+
+            $cpuUsages += $cpuPercent
+            $memoryUsages += $rawAfter.MemoryMB
+            $cpuDeltas += $cpuPercent
+            $memoryDeltas += $memoryDelta
+
+            Write-Host "NATS CPU: $([math]::Round($cpuPercent, 2))%"
+            Write-Host "NATS Memory: $([math]::Round($rawAfter.MemoryMB, 2)) MB (Delta: $([math]::Round($memoryDelta, 2)) MB)"
+        }
+        
+    } catch {
+        Write-Host "Error on iteration $i : $_"
+        $durations += 0
+    }
+    
+    # Small delay between iterations
+    Start-Sleep -Milliseconds 500
+}
+
+# ===============================
+# Calculate and Display Statistics
+# ===============================
+Write-Host "`n`n===============================`n"
+Write-Host "BENCHMARK SUMMARY`n"
+Write-Host "===============================`n"
+
+# Duration Statistics
+$avgDuration = ($durations | Measure-Object -Average).Average
+$minDuration = ($durations | Measure-Object -Minimum).Minimum
+$maxDuration = ($durations | Measure-Object -Maximum).Maximum
+$totalDuration = ($durations | Measure-Object -Sum).Sum
+
+Write-Host "Duration Statistics:"
+Write-Host "  Average: $([math]::Round($avgDuration, 2)) ms"
+Write-Host "  Minimum: $([math]::Round($minDuration, 2)) ms"
+Write-Host "  Maximum: $([math]::Round($maxDuration, 2)) ms"
+Write-Host "  Total: $([math]::Round($totalDuration / 1000, 2)) seconds"
+
+# Throughput Statistics
+$avgThroughput = $Count / ($avgDuration / 1000)
+Write-Host "`nThroughput Statistics:"
+Write-Host "  Average: $([math]::Round($avgThroughput, 2)) messages/sec"
+Write-Host "  Total Messages Sent: $($Count * $Iterations)"
+
+# CPU Statistics (if available)
+if ($cpuUsages.Count -gt 0) {
+    $avgCpu = ($cpuUsages | Measure-Object -Average).Average
+    $minCpu = ($cpuUsages | Measure-Object -Minimum).Minimum
+    $maxCpu = ($cpuUsages | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container CPU Usage Statistics:"
+    Write-Host "  Average: $([math]::Round($avgCpu, 2))%"
+    Write-Host "  Minimum: $([math]::Round($minCpu, 2))%"
+    Write-Host "  Maximum: $([math]::Round($maxCpu, 2))%"
+}
+
+# Memory Statistics (if available)
+if ($memoryUsages.Count -gt 0) {
+    $avgMemory = ($memoryUsages | Measure-Object -Average).Average
+    $minMemory = ($memoryUsages | Measure-Object -Minimum).Minimum
+    $maxMemory = ($memoryUsages | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container Memory Usage Statistics:"
+    Write-Host "  Average: $([math]::Round($avgMemory, 2)) MB"
+    Write-Host "  Minimum: $([math]::Round($minMemory, 2)) MB"
+    Write-Host "  Maximum: $([math]::Round($maxMemory, 2)) MB"
+}
+
+# CPU Delta Statistics (if available)
+if ($cpuDeltas.Count -gt 0) {
+    $avgCpuDelta = ($cpuDeltas | Measure-Object -Average).Average
+    $minCpuDelta = ($cpuDeltas | Measure-Object -Minimum).Minimum
+    $maxCpuDelta = ($cpuDeltas | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container CPU Delta (Before/After) Statistics:"
+    Write-Host "  Average Change: $([math]::Round($avgCpuDelta, 2))%"
+    Write-Host "  Minimum Change: $([math]::Round($minCpuDelta, 2))%"
+    Write-Host "  Maximum Change: $([math]::Round($maxCpuDelta, 2))%"
+}
+
+# Memory Delta Statistics (if available)
+if ($memoryDeltas.Count -gt 0) {
+    $avgMemoryDelta = ($memoryDeltas | Measure-Object -Average).Average
+    $minMemoryDelta = ($memoryDeltas | Measure-Object -Minimum).Minimum
+    $maxMemoryDelta = ($memoryDeltas | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container Memory Delta (Before/After) Statistics:"
+    Write-Host "  Average Change: $([math]::Round($avgMemoryDelta, 2)) MB"
+    Write-Host "  Minimum Change: $([math]::Round($minMemoryDelta, 2)) MB"
+    Write-Host "  Maximum Change: $([math]::Round($maxMemoryDelta, 2)) MB"
+}
+
+Write-Host "`n===============================`n"
+Write-Host "Benchmark Complete!`n"
+Write-Host "===============================`n"
+
+
+
+
+
+
+
+
+program.cs (producer api)
+
+
+using NATS.Client.Core;
+using System.Text.Json;
+using consumer.Dtos;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Register NATS connection as singleton
+builder.Services.AddSingleton(sp =>
+{
+    var natsUrl = Environment.GetEnvironmentVariable("NATS_URL") ?? "nats://localhost:4222";
+    var opts = NatsOpts.Default with { Url = natsUrl };
+    return new NatsConnection(opts);
+});
+
+var app = builder.Build();
+
+var nats = app.Services.GetRequiredService<NatsConnection>();
+var js = new NatsJSContext(nats);
+
+try
+{
+    await js.CreateStreamAsync(new StreamConfig
+    {
+        Name = "ORDERS_STREAM",
+        Subjects = new[] { "test" },
+        Storage = StreamConfigStorage.File
+    });
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"JetStream stream setup warning: {ex.Message}");
+    // If the stream already exists or server isn't ready yet, continue starting the app
+}
+
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.MapPost("/api/publish", async (MessageRequest request, NatsConnection nats) =>
+{
+    try
+    {
+        var message = new Message
+        {
+            Id = Guid.NewGuid().ToString(),
+            Content = request.Content,
+            Timestamp = DateTime.UtcNow
+        };
+
+        var payload = JsonSerializer.SerializeToUtf8Bytes(message);
+
+        // await nats.PublishAsync(subject: "orders.created", data: message);
+        // await nats.PublishAsync("orders.created", payload).AsTask();
+        var js = new NatsJSContext(nats);
+        await js.PublishAsync("test", payload);
+
+        return Results.Ok(new
+        {
+            Success = true,
+            MessageId = message.Id,
+            Message = "Message published successfully"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error publishing message: {ex.Message}");
+    }
+});
+
+// Publish batch messages for testing
+app.MapPost("/api/publish-batch", async (int count, NatsConnection nats) =>
+{
+    try
+    {
+        var tasks = new List<Task>();
+        var messageIds = new List<string>();
+
+        for (int i = 0; i < count; i++)
+        {
+            var message = new Message
+            {
+                Id = Guid.NewGuid().ToString(),
+                Content = $"Batch message {i + 1}",
+                Timestamp = DateTime.UtcNow
+            };
+            messageIds.Add(message.Id);
+
+            var payload = JsonSerializer.SerializeToUtf8Bytes(message);
+
+            // ✔ Publish raw bytes
+
+            var publishTask = js.PublishAsync("test", payload);
+            tasks.Add(publishTask.AsTask());
+
+            // tasks.Add(nats.PublishAsync("orders.created", payload).AsTask());
+
+            // tasks.Add(nats.PublishAsync(subject: "orders.created", data: message).AsTask());
+        }
+
+        await Task.WhenAll(tasks);
+
+        return Results.Ok(new
+        {
+            Success = true,
+            Count = count,
+            // MessageIds = messageIds,
+            // Message = $"{count} messages published successfully"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error publishing batch: {ex.Message}");
+    }
+});
+
+// Health check
+app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Service = "Producer API" }));
+
+app.UseHttpsRedirection();
+
+app.Run();
+
+
+
+
+
+
+
+
+
+
+natsConsumerservice.cs
+
+using NATS.Client.Core;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using consumer.Dtos;
+using System.Text.Json;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
+
+namespace Consumer.Service;
+
+public class NatsConsumerService : BackgroundService
+{
+    private readonly NatsConnection _nats;
+    private readonly ConcurrentBag<ReceivedMessage> _messages;
+    private readonly ILogger<NatsConsumerService> _logger;
+
+    public NatsConsumerService(
+        NatsConnection nats,
+        ConcurrentBag<ReceivedMessage> messages,
+        ILogger<NatsConsumerService> logger)
+    {
+        _nats = nats;
+        _messages = messages;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("JetStream Consumer starting");
+
+        var js = new NatsJSContext(_nats);
+
+        // Retry loop: wait for JetStream and stream/consumer to be available.
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // Ensure stream exists (idempotent). If JetStream isn't enabled, this will throw NoResponders.
+                try
+                {
+                    await js.CreateStreamAsync(new StreamConfig
+                    {
+                        Name = "ORDERS_STREAM",
+                        Subjects = new[] { "test" },
+                        Storage = StreamConfigStorage.File
+                    }, stoppingToken);
+                }
+                catch (NATS.Client.Core.NatsNoRespondersException)
+                {
+                    _logger.LogWarning("JetStream API not available (No responders). Ensure NATS is started with JetStream: 'nats-server -js -p 4222'. Retrying...");
+                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // Stream may already exist or server not fully ready; log and continue.
+                    _logger.LogDebug(ex, "CreateStreamAsync warning (may already exist)");
+                }
+
+                // Create or load durable consumer
+                var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS_STREAM", new ConsumerConfig
+                {
+                    AckPolicy = ConsumerConfigAckPolicy.Explicit,
+                    FilterSubject = "test"
+                });
+
+                _logger.LogInformation("JetStream Consumer connected; starting pull consumption");
+
+                // Pull-style consumption (guaranteed delivery)
+                await foreach (var msg in consumer.ConsumeAsync<byte[]>(null, null, stoppingToken))
+                {
+                    try
+                    {
+                        var message = JsonSerializer.Deserialize<Message>(msg.Data)!;
+
+                        var receivedAt = DateTime.UtcNow;
+                        var latency = (receivedAt - message.Timestamp).TotalMilliseconds;
+
+                        _messages.Add(new ReceivedMessage
+                        {
+                            MessageId = message.Id,
+                            Content = message.Content,
+                            OriginalTimestamp = message.Timestamp,
+                            ReceivedAt = receivedAt,
+                            LatencyMs = latency
+                        });
+
+                        await msg.AckAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing message");
+                        await msg.NakAsync();
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Normal shutdown
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Consumer setup or loop failed; retrying shortly");
+                try { await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken); } catch { }
+            }
+        }
+    }
+
+}
+
+
+
+
+
+
+// for docker banchmark file 
+# ===============================
+# Benchmark Configuration
+# ===============================
+$Count = 500000
+$Iterations = 10
+$Url = "http://localhost:5001/api/publish-batch?count=$Count"
+
+# Arrays to store metrics
+$durations = @()
+$cpuUsages = @()
+$memoryUsages = @()
+$cpuDeltas = @()
+$memoryDeltas = @()
+
+Write-Host "===============================`n"
+Write-Host "Starting Benchmark Test`n"
+Write-Host "Messages per iteration: $Count`n"
+Write-Host "Total iterations: $Iterations`n"
+Write-Host "===============================`n"
+
+# Get the NATS container name - update this with your actual container name/ID
+$containerName = "9ae666497f5379cd81edb174d365aad9adac3617a03a8a08b661eb273b6f0cae"  # Change this to your NATS container name or ID
+
+# Function to get Docker container stats
+function Get-DockerStats {
+    param($containerName)
+    
+    try {
+        $stats = docker stats $containerName --no-stream --format "{{.CPUPerc}},{{.MemUsage}}" 2>$null
+        if ($stats) {
+            $parts = $stats -split ','
+            $cpuPercent = $parts[0] -replace '%', ''
+            $memUsage = $parts[1] -split '/' | Select-Object -First 1
+            
+            # Convert memory to MB if needed
+            if ($memUsage -match '(\d+\.?\d*)([MGK]i?B)') {
+                $value = [double]$matches[1]
+                $unit = $matches[2]
+                
+                $memoryMB = switch -Wildcard ($unit) {
+                    "G*" { $value * 1024 }
+                    "M*" { $value }
+                    "K*" { $value / 1024 }
+                    default { $value }
+                }
+            } else {
+                $memoryMB = 0
+            }
+            
+            return @{
+                CPU = [double]$cpuPercent
+                Memory = $memoryMB
+            }
+        }
+    } catch {
+        Write-Host "Warning: Could not get Docker stats"
+    }
+    
+    return $null
+}
+
+# ===============================
+# Main Benchmark Loop
+# ===============================
+for ($i = 1; $i -le $Iterations; $i++) {
+    Write-Host "`n--- Iteration $i of $Iterations ---"
+    
+    # Capture CPU and Memory before the call
+    $statsBefore = Get-DockerStats -containerName $containerName
+    
+    # Make the API call
+    $start = Get-Date
+    try {
+        $response = Invoke-WebRequest -Uri $Url -Method POST -TimeoutSec 120
+        $end = Get-Date
+        $duration = ($end - $start).TotalMilliseconds
+        
+        # Store duration
+        $durations += $duration
+        
+        Write-Host "Status: $($response.StatusCode)"
+        Write-Host "Time Taken: $([math]::Round($duration, 2)) ms"
+        Write-Host "Throughput: $([math]::Round($Count / ($duration / 1000), 2)) messages/sec"
+        
+        # Capture CPU and Memory after the call
+        Start-Sleep -Milliseconds 500  # Small delay to let metrics update
+        
+        $statsAfter = Get-DockerStats -containerName $containerName
+        
+        if ($statsAfter -and $statsBefore) {
+            $cpuDelta = $statsAfter.CPU - $statsBefore.CPU
+            $memoryDelta = $statsAfter.Memory - $statsBefore.Memory
+            
+            $cpuUsages += $statsAfter.CPU
+            $memoryUsages += $statsAfter.Memory
+            $cpuDeltas += $cpuDelta
+            $memoryDeltas += $memoryDelta
+            
+            Write-Host "NATS Container CPU: $([math]::Round($statsAfter.CPU, 2))% (Delta: $([math]::Round($cpuDelta, 2))%)"
+            Write-Host "NATS Container Memory: $([math]::Round($statsAfter.Memory, 2)) MB (Delta: $([math]::Round($memoryDelta, 2)) MB)"
+        } elseif ($statsAfter) {
+            $cpuUsages += $statsAfter.CPU
+            $memoryUsages += $statsAfter.Memory
+            
+            Write-Host "NATS Container CPU: $([math]::Round($statsAfter.CPU, 2))%"
+            Write-Host "NATS Container Memory: $([math]::Round($statsAfter.Memory, 2)) MB"
+        }
+        
+    } catch {
+        Write-Host "Error on iteration $i : $_"
+        $durations += 0
+    }
+    
+    # Small delay between iterations
+    Start-Sleep -Milliseconds 500
+}
+
+# ===============================
+# Calculate and Display Statistics
+# ===============================
+Write-Host "`n`n===============================`n"
+Write-Host "BENCHMARK SUMMARY`n"
+Write-Host "===============================`n"
+
+# Duration Statistics
+$avgDuration = ($durations | Measure-Object -Average).Average
+$minDuration = ($durations | Measure-Object -Minimum).Minimum
+$maxDuration = ($durations | Measure-Object -Maximum).Maximum
+$totalDuration = ($durations | Measure-Object -Sum).Sum
+
+Write-Host "Duration Statistics:"
+Write-Host "  Average: $([math]::Round($avgDuration, 2)) ms"
+Write-Host "  Minimum: $([math]::Round($minDuration, 2)) ms"
+Write-Host "  Maximum: $([math]::Round($maxDuration, 2)) ms"
+Write-Host "  Total: $([math]::Round($totalDuration / 1000, 2)) seconds"
+
+# Throughput Statistics
+$avgThroughput = $Count / ($avgDuration / 1000)
+Write-Host "`nThroughput Statistics:"
+Write-Host "  Average: $([math]::Round($avgThroughput, 2)) messages/sec"
+Write-Host "  Total Messages Sent: $($Count * $Iterations)"
+
+# CPU Statistics (if available)
+if ($cpuUsages.Count -gt 0) {
+    $avgCpu = ($cpuUsages | Measure-Object -Average).Average
+    $minCpu = ($cpuUsages | Measure-Object -Minimum).Minimum
+    $maxCpu = ($cpuUsages | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container CPU Usage Statistics:"
+    Write-Host "  Average: $([math]::Round($avgCpu, 2))%"
+    Write-Host "  Minimum: $([math]::Round($minCpu, 2))%"
+    Write-Host "  Maximum: $([math]::Round($maxCpu, 2))%"
+}
+
+# Memory Statistics (if available)
+if ($memoryUsages.Count -gt 0) {
+    $avgMemory = ($memoryUsages | Measure-Object -Average).Average
+    $minMemory = ($memoryUsages | Measure-Object -Minimum).Minimum
+    $maxMemory = ($memoryUsages | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container Memory Usage Statistics:"
+    Write-Host "  Average: $([math]::Round($avgMemory, 2)) MB"
+    Write-Host "  Minimum: $([math]::Round($minMemory, 2)) MB"
+    Write-Host "  Maximum: $([math]::Round($maxMemory, 2)) MB"
+}
+
+# CPU Delta Statistics (if available)
+if ($cpuDeltas.Count -gt 0) {
+    $avgCpuDelta = ($cpuDeltas | Measure-Object -Average).Average
+    $minCpuDelta = ($cpuDeltas | Measure-Object -Minimum).Minimum
+    $maxCpuDelta = ($cpuDeltas | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container CPU Delta (Before/After) Statistics:"
+    Write-Host "  Average Change: $([math]::Round($avgCpuDelta, 2))%"
+    Write-Host "  Minimum Change: $([math]::Round($minCpuDelta, 2))%"
+    Write-Host "  Maximum Change: $([math]::Round($maxCpuDelta, 2))%"
+}
+
+# Memory Delta Statistics (if available)
+if ($memoryDeltas.Count -gt 0) {
+    $avgMemoryDelta = ($memoryDeltas | Measure-Object -Average).Average
+    $minMemoryDelta = ($memoryDeltas | Measure-Object -Minimum).Minimum
+    $maxMemoryDelta = ($memoryDeltas | Measure-Object -Maximum).Maximum
+    
+    Write-Host "`nNATS Container Memory Delta (Before/After) Statistics:"
+    Write-Host "  Average Change: $([math]::Round($avgMemoryDelta, 2)) MB"
+    Write-Host "  Minimum Change: $([math]::Round($minMemoryDelta, 2)) MB"
+    Write-Host "  Maximum Change: $([math]::Round($maxMemoryDelta, 2)) MB"
+}
+
+Write-Host "`n===============================`n"
+Write-Host "Benchmark Complete!`n"
+Write-Host "===============================`n"
