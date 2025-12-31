@@ -1,4 +1,4 @@
-namespace consumer.Dtos;
+namespace Producer.Dtos;
 
 public record MessageRequest(string Content);
 

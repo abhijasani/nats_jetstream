@@ -57,20 +57,31 @@ public class NatsConsumerService : BackgroundService
                     _logger.LogDebug(ex, "CreateStreamAsync warning (may already exist)");
                 }
 
-                // Create or load durable consumer
+
+                // Create or load durable consumer - DeliverNew means only new messages
                 var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS_STREAM", new ConsumerConfig
                 {
+                    Name = "orders-consumer",  // Durable consumer name
+                    DurableName = "orders-consumer",  // Makes consumer persistent
                     AckPolicy = ConsumerConfigAckPolicy.Explicit,
-                    FilterSubject = "test"
+                    FilterSubject = "test",
+                    DeliverPolicy = ConsumerConfigDeliverPolicy.New,  // Only receive NEW messages, not old ones
                 });
 
-                _logger.LogInformation("JetStream Consumer connected; starting pull consumption");
+                _logger.LogInformation("JetStream Consumer connected to {Server} (DeliverPolicy=New); starting pull consumption", _nats.ServerInfo?.Name);
 
                 // Pull-style consumption (guaranteed delivery)
                 await foreach (var msg in consumer.ConsumeAsync<byte[]>(null, null, stoppingToken))
                 {
                     try
                     {
+                        // Check if connection is still healthy
+                        if (_nats.ConnectionState != NatsConnectionState.Open)
+                        {
+                            _logger.LogWarning("Connection lost during consumption. Breaking to reconnect...");
+                            break;
+                        }
+
                         var message = JsonSerializer.Deserialize<Message>(msg.Data)!;
 
                         var receivedAt = DateTime.UtcNow;
@@ -90,9 +101,11 @@ public class NatsConsumerService : BackgroundService
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error processing message");
-                        await msg.NakAsync();
+                        try { await msg.NakAsync(); } catch { /* Ignore if NAK fails during disconnect */ }
                     }
                 }
+
+                _logger.LogInformation("Consume loop exited. Will retry connection...");
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -101,8 +114,8 @@ public class NatsConsumerService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Consumer setup or loop failed; retrying shortly");
-                try { await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken); } catch { }
+                _logger.LogWarning(ex, "Consumer setup or loop failed (State: {State}); retrying in 3 seconds...", _nats.ConnectionState);
+                try { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); } catch { }
             }
         }
     }
